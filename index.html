@@ -342,7 +342,11 @@ async function callClaude(systemPrompt, userPrompt){
   });
   if(!res.ok){ throw new Error('El backend respondió con error ' + res.status); }
   const data = await res.json();
-  if(data.error){ throw new Error(data.error); }
+  if(data.error){
+    let msg = data.error;
+    if(data.details){ msg += ' — ' + String(data.details).slice(0,220); }
+    throw new Error(msg);
+  }
   if(!data.text){ throw new Error('Respuesta vacía del backend'); }
   return data.text;
 }
