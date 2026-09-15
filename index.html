@@ -368,7 +368,8 @@ async function saveEmployees(){ try{ await appStore.set('employees', JSON.string
 async function saveResults(){ try{ await appStore.set('results', JSON.stringify(state.results)); }catch(e){ console.error(e); } }
 
 /* ---------- Gemini API ---------- */
-async function callGemini(systemPrompt, userPrompt){
+async function callGemini(systemPrompt, userPrompt, options){
+  options = options || {};
   if(!state.settings.scriptUrl){
     throw new Error('No has configurado la URL del backend. Ve a Configuración y pega la URL de tu Apps Script.');
   }
@@ -376,7 +377,8 @@ async function callGemini(systemPrompt, userPrompt){
     method:'POST',
     headers:{'Content-Type':'text/plain;charset=utf-8'},
     body: JSON.stringify({
-      max_tokens:1200,
+      max_tokens: options.maxTokens || 2400,
+      json: options.json === true,
       system: systemPrompt,
       prompt: userPrompt
     })
@@ -392,8 +394,11 @@ async function callGemini(systemPrompt, userPrompt){
   return data.text;
 }
 function parseJsonLoose(text){
-  const cleaned = text.replace(/```json/g,'').replace(/```/g,'').trim();
-  return JSON.parse(cleaned);
+  const cleaned = text.replace(/```json/gi,'').replace(/```/g,'').trim();
+  const start = cleaned.indexOf('{'), end = cleaned.lastIndexOf('}');
+  if(start < 0 || end < start) throw new Error('Gemini no devolvió una estructura JSON completa.');
+  try{return JSON.parse(cleaned.slice(start,end+1));}
+  catch(e){throw new Error('La respuesta de Gemini quedó incompleta. Intenta nuevamente.');}
 }
 
 /* ---------- Text extraction ---------- */
@@ -441,7 +446,7 @@ Reglas: entre 4 y 6 módulos. El "summary" de cada módulo debe tener 1-2 frases
 DOCUMENTO FUENTE:
 """${sourceExcerpt}"""`;
 
-      const outlineRaw = await callGemini(outlineSys, outlinePrompt);
+      const outlineRaw = await callGemini(outlineSys, outlinePrompt, {json:true,maxTokens:8192});
       const outline = parseJsonLoose(outlineRaw);
 
       const modules = [];
@@ -459,7 +464,7 @@ Extensión: 150-220 palabras, en párrafos cortos y, si aplica, una lista con vi
 Basa el contenido en este documento fuente (usa solo lo relevante para este módulo):
 """${sourceExcerpt}"""`;
 
-        const content = await callGemini(modSys, modPrompt);
+        const content = await callGemini(modSys, modPrompt, {maxTokens:2400});
         modules.push({title: m.title, content: content.trim()});
       }
 
@@ -504,7 +509,7 @@ Reglas: entre 8 y 12 diapositivas. Cada diapositiva con 3 a 5 viñetas breves (m
 DOCUMENTO FUENTE:
 """${sourceExcerpt}"""`;
 
-      const raw = await callGemini(sys, prompt);
+      const raw = await callGemini(sys, prompt, {json:true,maxTokens:8192});
       const deck = parseJsonLoose(raw);
 
       w.progressPct = 90;
