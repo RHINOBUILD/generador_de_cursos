@@ -269,6 +269,31 @@
   .icon-btn:disabled{opacity:.35;cursor:not-allowed;}
 
   .err-box{border:1px solid #E6BBA8;background:#FBEAE3;color:#8A3016;border-radius:var(--radius-m);padding:12px 16px;font-size:13px;margin-top:16px;}
+
+  /* Administration */
+  .toolbar{display:flex;gap:10px;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;}
+  .search,.form-control{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:var(--radius-s);background:#fff;color:var(--ink);font:inherit;font-size:13px;}
+  .search{max-width:320px;}
+  .table-wrap{overflow:auto;border:1px solid var(--line);border-radius:var(--radius-m);background:var(--surface);}
+  .data-table{width:100%;border-collapse:collapse;min-width:720px;}
+  .data-table th,.data-table td{padding:12px 14px;border-bottom:1px solid var(--line-soft);text-align:left;font-size:12.5px;vertical-align:middle;}
+  .data-table th{font-size:10.5px;letter-spacing:.04em;color:var(--ink-faint);background:#F8FAF9;}
+  .data-table tr:last-child td{border-bottom:0;}
+  .pill{display:inline-block;padding:4px 8px;border-radius:999px;background:var(--brand-soft);color:var(--brand-ink);font-size:11px;font-weight:700;}
+  .pill.ok{background:#E4F3E8;color:#276B3D}.pill.bad{background:#FBEAE3;color:#8A3016}.pill.mid{background:#FBF0DD;color:#8A5A17}
+  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .form-group label{display:block;font-size:11.5px;font-weight:700;color:var(--ink-soft);margin-bottom:6px;}
+  .panel{border:1px solid var(--line);border-radius:var(--radius-m);padding:20px;background:var(--surface);margin-bottom:18px;}
+  .panel-title{font-family:var(--serif);font-size:18px;font-weight:600;margin-bottom:14px;}
+  .danger-link{border:0;background:none;color:var(--warn);cursor:pointer;font:inherit;font-size:12px;font-weight:600;}
+  .progress-track{height:7px;border-radius:99px;background:var(--line-soft);overflow:hidden;min-width:100px;}
+  .progress-track span{display:block;height:100%;background:var(--brand);}
+  .notice{padding:12px 14px;border:1px solid #ADD3CC;background:var(--brand-soft);color:var(--brand-ink);border-radius:var(--radius-m);font-size:12.5px;margin-bottom:16px;}
+
+  @media(max-width:760px){
+    .app{display:block;padding-bottom:72px}.sidebar{width:100%;height:auto;position:fixed;z-index:20;bottom:0;top:auto;border:0;border-top:1px solid var(--line);padding:7px 8px}.brandmark,.sidebar-foot{display:none}.navlist{display:flex;flex-direction:row;overflow-x:auto;gap:3px}.navlist button{min-width:max-content;flex-direction:column;gap:3px;padding:7px 9px;font-size:10.5px}.navlist .dot{width:4px;height:4px}
+    .topbar{padding:13px 16px}.view{padding:22px 16px 38px}.stat-row{display:grid;grid-template-columns:1fr 1fr}.stat:last-child{grid-column:1/-1}.company-grid,.company-pick,.opt-grid,.form-grid{grid-template-columns:1fr}.course-body{display:block}.module-nav{position:static;width:100%;margin-bottom:22px;max-height:190px;overflow:auto}.course-head{align-items:flex-start;flex-wrap:wrap}.download-group{width:100%}.btn-dl{flex:1;justify-content:center}.slide-frame{aspect-ratio:auto;min-height:340px;padding:30px 25px}.toolbar{align-items:stretch}.search{max-width:none}
+  }
 </style>
 </head>
 <body>
@@ -288,6 +313,8 @@ const LOGO_DATA_URI = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wCEAA
 let state = {
   view: 'home',
   courses: [],
+  employees: [],
+  results: [],
   loaded: false,
   settings: { scriptUrl: '' },
   settingsLoaded: false,
@@ -296,38 +323,52 @@ let state = {
   activeCourseId: null,
   activeModuleIdx: 0,
   activeSlideIdx: 0,
+  currentLearnerId: '',
   quizAnswers: {},
   quizSubmitted: false
 };
 
 /* ---------- Storage ---------- */
+const appStore = {
+  async get(key){
+    if(window.storage && typeof window.storage.get === 'function') return window.storage.get(key, false);
+    const value = localStorage.getItem('nexosalud_' + key);
+    return value === null ? null : {value};
+  },
+  async set(key, value){
+    if(window.storage && typeof window.storage.set === 'function') return window.storage.set(key, value, false);
+    localStorage.setItem('nexosalud_' + key, value);
+  }
+};
 async function loadCourses(){
   try{
-    const r = await window.storage.get('courses', false);
+    const r = await appStore.get('courses');
     state.courses = r ? JSON.parse(r.value) : [];
   }catch(e){ state.courses = []; }
   state.loaded = true;
   render();
 }
 async function saveCourses(){
-  try{ await window.storage.set('courses', JSON.stringify(state.courses), false); }
+  try{ await appStore.set('courses', JSON.stringify(state.courses)); }
   catch(e){ console.error('storage error', e); }
 }
 
 async function loadSettings(){
   try{
-    const r = await window.storage.get('settings', false);
+    const r = await appStore.get('settings');
     if(r) state.settings = JSON.parse(r.value);
   }catch(e){ /* no settings saved yet */ }
   state.settingsLoaded = true;
 }
 async function saveSettings(){
-  try{ await window.storage.set('settings', JSON.stringify(state.settings), false); }
+  try{ await appStore.set('settings', JSON.stringify(state.settings)); }
   catch(e){ console.error('storage error', e); }
 }
+async function saveEmployees(){ try{ await appStore.set('employees', JSON.stringify(state.employees)); }catch(e){ console.error(e); } }
+async function saveResults(){ try{ await appStore.set('results', JSON.stringify(state.results)); }catch(e){ console.error(e); } }
 
-/* ---------- Claude API ---------- */
-async function callClaude(systemPrompt, userPrompt){
+/* ---------- Gemini API ---------- */
+async function callGemini(systemPrompt, userPrompt){
   if(!state.settings.scriptUrl){
     throw new Error('No has configurado la URL del backend. Ve a Configuración y pega la URL de tu Apps Script.');
   }
@@ -400,7 +441,7 @@ Reglas: entre 4 y 6 módulos. El "summary" de cada módulo debe tener 1-2 frases
 DOCUMENTO FUENTE:
 """${sourceExcerpt}"""`;
 
-      const outlineRaw = await callClaude(outlineSys, outlinePrompt);
+      const outlineRaw = await callGemini(outlineSys, outlinePrompt);
       const outline = parseJsonLoose(outlineRaw);
 
       const modules = [];
@@ -418,7 +459,7 @@ Extensión: 150-220 palabras, en párrafos cortos y, si aplica, una lista con vi
 Basa el contenido en este documento fuente (usa solo lo relevante para este módulo):
 """${sourceExcerpt}"""`;
 
-        const content = await callClaude(modSys, modPrompt);
+        const content = await callGemini(modSys, modPrompt);
         modules.push({title: m.title, content: content.trim()});
       }
 
@@ -463,7 +504,7 @@ Reglas: entre 8 y 12 diapositivas. Cada diapositiva con 3 a 5 viñetas breves (m
 DOCUMENTO FUENTE:
 """${sourceExcerpt}"""`;
 
-      const raw = await callClaude(sys, prompt);
+      const raw = await callGemini(sys, prompt);
       const deck = parseJsonLoose(raw);
 
       w.progressPct = 90;
@@ -506,7 +547,8 @@ function renderBody(text){
   const lines = text.split('\n').map(l=>l.trim()).filter(l=>l.length);
   let html = ''; let inList = false;
   for(const line of lines){
-    const bolded = line.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    const safeLine = escapeHtml(line);
+    const bolded = safeLine.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
     if(/^[-•]\s+/.test(line)){
       if(!inList){ html += '<ul>'; inList = true; }
       html += '<li>' + bolded.replace(/^[-•]\s+/, '') + '</li>';
@@ -551,6 +593,7 @@ function renderSidebar(){
     {id:'home', label:'Inicio'},
     {id:'courses', label:'Mis cursos'},
     {id:'create', label:'Crear contenido'},
+    {id:'employees', label:'Colaboradores'},
     {id:'results', label:'Resultados'},
     {id:'companies', label:'Empresas'},
     {id:'settings', label:'Configuración'}
@@ -588,6 +631,7 @@ function renderMain(){
   else if(state.view === 'create') view.appendChild(renderWizard());
   else if(state.view === 'courses') view.appendChild(renderCoursesList());
   else if(state.view === 'courseDetail') view.appendChild(renderCourseDetail());
+  else if(state.view === 'employees') view.appendChild(renderEmployees());
   else if(state.view === 'results') view.appendChild(renderResults());
   else if(state.view === 'companies') view.appendChild(renderCompanies());
   else if(state.view === 'settings') view.appendChild(renderSettings());
@@ -598,7 +642,7 @@ function renderMain(){
 function topbarTitle(){
   return ({
     home:'Buenas tardes, Fernando', create:'Crear contenido', courses:'Mis cursos',
-    courseDetail:'Curso', results:'Resultados', companies:'Empresas del corporativo',
+    courseDetail:'Curso', employees:'Colaboradores y asignaciones', results:'Avance y calificaciones', companies:'Empresas del corporativo',
     settings:'Configuración del backend'
   })[state.view] || '';
 }
@@ -726,6 +770,7 @@ function courseRow(c){
   const co = COMPANIES[c.company];
   return el('div',{class:'course-row', onclick:()=>{
       state.activeCourseId = c.id; state.activeModuleIdx=0; state.activeSlideIdx=0; state.quizAnswers={}; state.quizSubmitted=false;
+      state.currentLearnerId='';
       state.view='courseDetail'; render();
     }},[
     chip(co, 38),
@@ -778,28 +823,73 @@ function renderCompanies(){
   return wrap;
 }
 
-function renderResults(){
+function renderEmployees(){
   const wrap = el('div', {});
-  const withQuiz = state.courses.filter(c=>c.type==='curso');
-  if(!withQuiz.length){
-    wrap.appendChild(el('div',{class:'empty'},['Los resultados de evaluación aparecerán aquí cuando existan cursos interactivos con quiz.']));
-    return wrap;
-  }
-  wrap.appendChild(el('h2',{class:'sec'},['Cursos con evaluación']));
-  wrap.appendChild(el('div',{class:'course-list'}, withQuiz.map(c=>{
-    const co = COMPANIES[c.company];
-    return el('div',{class:'course-row', onclick:()=>{
-        state.activeCourseId=c.id; state.activeModuleIdx=c.modules.length; state.quizAnswers={}; state.quizSubmitted=false;
-        state.view='courseDetail'; render();
-      }},[
-      chip(co,38),
-      el('div',{class:'cr-body'},[
-        el('div',{class:'cr-title'},[c.title]),
-        el('div',{class:'cr-meta'},[`${c.quiz.length} preguntas de evaluación`])
-      ])
+  const panel = el('div',{class:'panel'});
+  panel.appendChild(el('div',{class:'panel-title'},['Registrar colaborador']));
+  const name = el('input',{class:'form-control',placeholder:'Nombre completo'});
+  const number = el('input',{class:'form-control',placeholder:'Número de empleado'});
+  const area = el('input',{class:'form-control',placeholder:'Área o departamento'});
+  const company = el('select',{class:'form-control'},[
+    el('option',{value:''},['Selecciona la empresa']),
+    ...Object.values(COMPANIES).map(c=>el('option',{value:c.id},[c.name]))
+  ]);
+  panel.appendChild(el('div',{class:'form-grid'},[
+    el('div',{class:'form-group'},[el('label',{},['NOMBRE']),name]),
+    el('div',{class:'form-group'},[el('label',{},['NÚMERO DE EMPLEADO']),number]),
+    el('div',{class:'form-group'},[el('label',{},['ÁREA']),area]),
+    el('div',{class:'form-group'},[el('label',{},['EMPRESA']),company])
+  ]));
+  panel.appendChild(el('div',{class:'wizard-actions',style:'justify-content:flex-end;margin-top:16px'},[
+    el('button',{class:'btn btn-primary',onclick:async()=>{
+      const employee={id:'e_'+Date.now(),name:name.value.trim(),number:number.value.trim(),area:area.value.trim(),company:company.value,assignments:[]};
+      if(!employee.name||!employee.number||!employee.company){ alert('Completa nombre, número de empleado y empresa.'); return; }
+      if(state.employees.some(e=>e.number.toLowerCase()===employee.number.toLowerCase())){ alert('Ese número de empleado ya está registrado.'); return; }
+      state.employees.unshift(employee); await saveEmployees(); render();
+    }},['Agregar colaborador'])
+  ]));
+  wrap.appendChild(panel);
+  if(!state.employees.length){ wrap.appendChild(el('div',{class:'empty'},['Aún no hay colaboradores registrados.'])); return wrap; }
+  const table=el('table',{class:'data-table'});
+  table.appendChild(el('thead',{},[el('tr',{},['Colaborador','Empresa','Área','Cursos asignados','Acciones'].map(x=>el('th',{},[x]))) ]));
+  const tbody=el('tbody');
+  state.employees.forEach(emp=>{
+    const assign=el('select',{class:'form-control',style:'min-width:180px'},[
+      el('option',{value:''},['Asignar curso…']),
+      ...state.courses.filter(c=>c.type==='curso'&&c.company===emp.company&&!emp.assignments.includes(c.id)).map(c=>el('option',{value:c.id},[c.title]))
     ]);
-  })));
-  return wrap;
+    assign.addEventListener('change',async()=>{if(assign.value){emp.assignments.push(assign.value);await saveEmployees();render();}});
+    tbody.appendChild(el('tr',{},[
+      el('td',{},[el('div',{style:'font-weight:700'},[emp.name]),el('div',{style:'color:var(--ink-faint);font-size:11px'},['# '+emp.number])]),
+      el('td',{},[COMPANIES[emp.company]?.name||emp.company]), el('td',{},[emp.area||'—']),
+      el('td',{},[el('span',{class:'pill'},[String(emp.assignments.length)]),' ',assign]),
+      el('td',{},[el('button',{class:'danger-link',onclick:async()=>{if(confirm('¿Eliminar a este colaborador?')){state.employees=state.employees.filter(e=>e.id!==emp.id);await saveEmployees();render();}}},['Eliminar'])])
+    ]));
+  });
+  table.appendChild(tbody); wrap.appendChild(el('div',{class:'table-wrap'},[table])); return wrap;
+}
+
+function downloadCertificate(result){
+  const emp=state.employees.find(e=>e.id===result.employeeId), c=state.courses.find(x=>x.id===result.courseId), co=c&&COMPANIES[c.company];
+  if(!emp||!c)return;
+  const win=window.open('','_blank');
+  win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Constancia</title><style>@page{size:letter landscape;margin:0}body{margin:0;font-family:Arial;color:#123;background:#fff}.cert{width:11in;height:8.5in;padding:.7in;box-sizing:border-box;border:.16in solid ${co.color};text-align:center;display:flex;flex-direction:column;justify-content:center}.brand{color:${co.color};font-weight:800;letter-spacing:.12em}.title{font:46px Georgia;margin:28px 0 12px}.name{font:38px Georgia;color:${co.color};border-bottom:1px solid #ccd6d4;padding-bottom:10px;margin:20px auto;width:78%}.course{font-size:24px;font-weight:700;margin:15px}.meta{color:#5b686b;margin-top:18px}.folio{font-size:11px;margin-top:35px;color:#7a8588}@media print{button{display:none}}</style></head><body><div class="cert"><div class="brand">${escapeHtml(co.name.toUpperCase())} · NEXOSALUD</div><div class="title">Constancia de participación</div><div>Se otorga a</div><div class="name">${escapeHtml(emp.name)}</div><div>por concluir satisfactoriamente el curso</div><div class="course">${escapeHtml(c.title)}</div><div class="meta">Calificación: ${result.score}% · ${new Date(result.date).toLocaleDateString('es-MX',{year:'numeric',month:'long',day:'numeric'})}</div><div class="folio">Folio ${escapeHtml(result.id.toUpperCase())}</div><button onclick="print()">Imprimir / Guardar PDF</button></div></body></html>`); win.document.close();
+}
+
+function renderResults(){
+  const wrap=el('div',{}), completed=state.results.length, passed=state.results.filter(r=>r.score>=70).length;
+  wrap.appendChild(el('div',{class:'stat-row'},[
+    el('div',{class:'stat'},[el('div',{class:'n'},[String(state.employees.length)]),el('div',{class:'l'},['Colaboradores registrados'])]),
+    el('div',{class:'stat'},[el('div',{class:'n'},[String(completed)]),el('div',{class:'l'},['Evaluaciones realizadas'])]),
+    el('div',{class:'stat'},[el('div',{class:'n'},[completed?Math.round(state.results.reduce((a,r)=>a+r.score,0)/completed)+'%':'—']),el('div',{class:'l'},['Promedio general'])])
+  ]));
+  if(!completed){wrap.appendChild(el('div',{class:'empty'},['Las calificaciones aparecerán cuando un colaborador responda una evaluación.']));return wrap;}
+  const table=el('table',{class:'data-table'}); table.appendChild(el('thead',{},[el('tr',{},['Colaborador','Curso','Calificación','Resultado','Fecha','Constancia'].map(x=>el('th',{},[x]))) ]));
+  const tbody=el('tbody'); state.results.forEach(r=>{const emp=state.employees.find(e=>e.id===r.employeeId),c=state.courses.find(x=>x.id===r.courseId);tbody.appendChild(el('tr',{},[
+    el('td',{},[emp?.name||'Colaborador eliminado']),el('td',{},[c?.title||'Curso eliminado']),el('td',{},[r.score+'%']),
+    el('td',{},[el('span',{class:'pill '+(r.score>=70?'ok':'bad')},[r.score>=70?'APROBADO':'NO APROBADO'])]),el('td',{},[new Date(r.date).toLocaleDateString('es-MX')]),
+    el('td',{},[r.score>=70?el('button',{class:'btn btn-ghost',onclick:()=>downloadCertificate(r)},['Descargar']):'—'])
+  ]));}); table.appendChild(tbody); wrap.appendChild(el('div',{class:'notice'},[`Aprobados: ${passed} de ${completed}. La calificación mínima configurada es 70%.`]));wrap.appendChild(el('div',{class:'table-wrap'},[table]));return wrap;
 }
 
 /* ---------- Settings ---------- */
@@ -807,7 +897,7 @@ function renderSettings(){
   const wrap = el('div', {class:'wizard'});
   wrap.appendChild(el('div',{class:'step-title'},['Backend de generación con IA']));
   wrap.appendChild(el('p',{style:'font-size:13.5px;color:var(--ink-soft);line-height:1.6;max-width:520px;margin:-8px 0 22px 0'},[
-    'NEXOSalud usa un backend en Google Apps Script (como tus otras herramientas de RH) para conectarse a Claude sin exponer ninguna clave en el navegador. Pega aquí la URL de tu implementación (termina en /exec). Descarga el archivo Code.gs si aún no lo has desplegado.'
+    'NEXOSalud usa un backend en Google Apps Script para conectarse a Gemini sin exponer la llave en el navegador. Pega aquí la URL de tu implementación (termina en /exec) y prueba la conexión.'
   ]));
 
   const input = el('input', {
@@ -848,7 +938,7 @@ function renderSettings(){
   wrap.appendChild(el('div',{style:'margin-top:34px;padding-top:22px;border-top:1px solid var(--line)'},[
     el('div',{class:'field-label', style:'margin-top:0'},['¿AÚN NO LO DESPLEGASTE?']),
     el('div',{style:'font-size:13px;color:var(--ink-soft);line-height:1.7'},[
-      '1. Ve a script.google.com y crea un proyecto nuevo. 2. Pega el contenido de Code.gs. 3. En Configuración del proyecto → Propiedades del script, agrega ANTHROPIC_API_KEY con tu clave de console.anthropic.com. 4. Implementar → Nueva implementación → Aplicación web → Ejecutar como "Yo" → Acceso "Cualquier usuario". 5. Copia la URL que termina en /exec y pégala arriba.'
+      '1. Crea una llave en Google AI Studio. 2. Ve a script.google.com y crea un proyecto. 3. Pega Code.gs. 4. En Configuración del proyecto → Propiedades del script, agrega GEMINI_API_KEY con tu llave. 5. Implementar → Nueva implementación → Aplicación web → Ejecutar como "Yo" → Acceso "Cualquier usuario". 6. Copia la URL terminada en /exec y pégala arriba.'
     ])
   ]));
 
@@ -1045,6 +1135,17 @@ function renderCourseBody(c, co){
 
 function renderQuiz(c){
   const wrap = el('div', {});
+  const eligible = state.employees.filter(e=>e.company===c.company && (!e.assignments.length || e.assignments.includes(c.id)));
+  if(!state.quizSubmitted){
+    const learner=el('select',{class:'form-control',style:'margin-bottom:16px'},[
+      el('option',{value:''},['Selecciona al colaborador que realiza la evaluación']),
+      ...eligible.map(e=>el('option',{value:e.id},[`${e.name} · #${e.number}`]))
+    ]);
+    learner.value=state.currentLearnerId||'';
+    learner.addEventListener('change',()=>{state.currentLearnerId=learner.value;});
+    wrap.appendChild(learner);
+    if(!eligible.length) wrap.appendChild(el('div',{class:'notice'},['Registra y asigna colaboradores para guardar calificaciones y emitir constancias.']));
+  }
   if(state.quizSubmitted){
     let correct = 0;
     c.quiz.forEach((q,i)=>{ if(state.quizAnswers[i]===q.correctIndex) correct++; });
@@ -1065,7 +1166,7 @@ function renderQuiz(c){
       });
       return box;
     })));
-    wrap.appendChild(el('button',{class:'btn btn-ghost', style:'margin-top:16px', onclick:()=>{state.quizAnswers={};state.quizSubmitted=false;render();}},['Reintentar']));
+    wrap.appendChild(el('button',{class:'btn btn-ghost', style:'margin-top:16px', onclick:()=>{state.quizAnswers={};state.quizSubmitted=false;state.currentLearnerId='';render();}},['Reintentar']));
     return wrap;
   }
 
@@ -1078,8 +1179,13 @@ function renderQuiz(c){
     wrap.appendChild(box);
   });
   const allAnswered = c.quiz.every((q,i)=> state.quizAnswers[i] !== undefined);
-  wrap.appendChild(el('button',{class:'btn btn-primary', disabled: !allAnswered ? true:undefined, style:'margin-top:8px',
-    onclick:()=>{ if(allAnswered){state.quizSubmitted=true; render();} }},['Enviar respuestas']));
+  wrap.appendChild(el('button',{class:'btn btn-primary', disabled: !(allAnswered && state.currentLearnerId) ? true:undefined, style:'margin-top:8px',
+    onclick:async()=>{ if(allAnswered && state.currentLearnerId){
+      let correct=0;c.quiz.forEach((q,i)=>{if(state.quizAnswers[i]===q.correctIndex)correct++;});
+      const score=Math.round((correct/c.quiz.length)*100);
+      state.results.unshift({id:'r_'+Date.now(),employeeId:state.currentLearnerId,courseId:c.id,score,date:new Date().toISOString()});
+      await saveResults();state.quizSubmitted=true;render();
+    } }},['Enviar y guardar calificación']));
   return wrap;
 }
 
@@ -1106,10 +1212,11 @@ function renderSlideDeck(c, co){
 (async function init(){
   await Promise.all([loadSettings(), (async()=>{
     try{
-      const r = await window.storage.get('courses', false);
+      const r = await appStore.get('courses');
       state.courses = r ? JSON.parse(r.value) : [];
     }catch(e){ state.courses = []; }
-  })()]);
+  })(),(async()=>{try{const r=await appStore.get('employees');state.employees=r?JSON.parse(r.value):[];}catch(e){state.employees=[];}})(),
+  (async()=>{try{const r=await appStore.get('results');state.results=r?JSON.parse(r.value):[];}catch(e){state.results=[];}})()]);
   state.loaded = true;
   render();
 })();
